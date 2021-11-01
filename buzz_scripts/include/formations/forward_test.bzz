@@ -1,0 +1,55 @@
+include "utils/nav_table.bzz"
+include "utils/vec2.bzz"
+
+target_pos = nil
+TEST_PATH_PTR =1
+FORWARDING = 1
+function forward_test(){
+	if(isnil(target_pos)){
+		#target_pos = {.x = pose.position.x+10, .y = pose.position.y}
+		target_pos = {.x =-2.407, .y = 0.0}
+	}
+	else{
+		var l_tar=math.vec2.sub(target_pos,pose.position)
+		l_tar = math.vec2.rotate(l_tar, -pose.orientation.yaw)
+		if(math.vec2.length(l_tar) > 0.1){
+			goto(l_tar.x*100,l_tar.y*100)
+		}
+		else{
+			goto(0.0,0.0)
+			log("Target reached !!")
+		}
+	}
+}
+
+function nav_table_test(){
+    var path_tracking_point=GLOBAL_TEST_PATH[TEST_PATH_PTR]
+    log("Path size ", size(GLOBAL_TEST_PATH), " current wp ", TEST_PATH_PTR)
+    if(FORWARDING){
+      log("FORwarding to (", path_tracking_point.x,",",path_tracking_point.y,")")
+      var last_wp = 0
+      if(not (goto_point(path_tracking_point, last_wp))){
+        # WP reached
+        if(TEST_PATH_PTR < size(GLOBAL_TEST_PATH)){
+          TEST_PATH_PTR = TEST_PATH_PTR + 1
+        }
+        else{
+          TEST_PATH_PTR = TEST_PATH_PTR - 1
+          FORWARDING = 0
+          goto(0.0,0.0)
+        }
+      }
+    }
+    else{
+      if(not (goto_point(path_tracking_point, last_wp))){
+        if(TEST_PATH_PTR > 1){
+          TEST_PATH_PTR = TEST_PATH_PTR - 1
+          goto(0.0,0.0)
+        }
+        else{
+          log("Reached Home !!")
+          goto(0.0,0.0)
+        }
+      }
+    }
+}

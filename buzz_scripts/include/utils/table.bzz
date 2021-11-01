@@ -1,0 +1,353 @@
+function table_print(t) {
+	if(t==nil)
+		log("Table do not exist!")
+	else {
+		foreach(t, function(key, value) {
+      log(key, " -> ", value)
+    })
+	}
+}
+
+function tableofvec_print(t) {
+	if(t==nil)
+		log("Table do not exist!")
+	else {
+		foreach(t, function(key, value) {
+      log(key, " -> ", value.x, value.y)
+    })
+	}
+}
+
+function table_copy(t) {
+  var t2 = {}
+  foreach(t, function(key, value) {
+      t2[key] = value
+    })
+  return t2
+}
+
+#
+#return the number of value in table
+#
+function count(table,value){
+	number=0
+	i=0
+	while(i<size(table)){
+		if(table[i]==value){
+			number=number+1
+		}
+		i=i+1
+	}
+	return number
+}
+
+#
+# State machine
+#
+function str2fct(value){
+	statef=idle
+	if(value=="TURNEDOFF")
+		statef=turnedoff
+	else if(value=="CUSFUN")
+		statef=cusfun
+	else if(value == "YOLO_DEMO")
+    	statef=yolo_demo
+	else if(value=="STOP")	# ends on turnedoff
+		statef=stop
+	else if(value=="LAUNCH") # ends on AUTO_LAUNCH_STATE
+		if(LAND_AFTER_BARRIER_EXPIRE == 1)
+			statef=launch
+		else
+			statef=launch_switch
+	else if(value=="GOHOME") # ends on AUTO_LAUNCH_STATE
+		statef=goinghome
+	else if(value=="WAYPOINT")
+		statef=indiWP
+	else if(value=="IDLE")
+		statef=idle
+	else if(value=="AGGREGATE")
+		statef=aggregate
+	else if(value=="POTENTIAL")
+		statef=lennardjones
+	else if(value=="PURSUIT")
+		statef=pursuit
+	else if(value=="CHAIN_FORMATION")
+		statef=chain_formation
+	else if(value=="TASK_ALLOCATE")	# or bidding ?
+		statef=graph_state
+	else if(value=="BIDDING")	# check the absolute path of the waypointlist csv file in bidding.bzz
+		statef=bidding
+	else if(value=="DEPLOY")	# check the absolute path of the waypointlist csv file in bidding.bzz
+		statef=voronoicentroid
+	else if(value=="PATHPLAN")	# ends on navigate, defined in rrtstar
+		statef=rrtstar
+	else if(value=="NAVIGATE")	# ends on idle, defined in rrtstar
+		statef=navigate
+	else if(value == "FOLLOW")	#TODO: not tested in new structure
+		statef=follow
+	else if(value == "PICTURE")	#TODO: not tested in new structure
+		statef=take_picture
+
+	return statef
+}
+#
+# map from int to state - vstig serialization limits to 9....
+#
+function i2s(value){
+	if(value==0){
+	return "CHAIN_FORMATION"
+	}else if(value==1){
+	return "IDLE"
+	}
+	else if(value==2){
+	return "DEPLOY"
+	}
+	else if(value==3){
+	return "STOP"
+	}
+	else if(value==4){
+	return "TURNEDOFF"
+	}
+	else if(value==5){
+	return "BARRIERWAIT"
+	}
+  else if(value==6){
+	return "WAYPOINT"
+	}
+  else if(value==7){
+	return "GOHOME"
+	}
+  else if(value==8){
+	return "LAUNCH"
+	}
+  else if(value==9){
+	return "TASK_ALLOCATE"
+	}
+  else {
+	return "UNDETERMINED"
+	}
+}
+function i2s_graph(value){
+	if(value==1){
+	return "GRAPH_FREE"
+	}
+	else if(value==2){
+	return "GRAPH_ASKING"
+	}
+	else if(value==3){
+	return "GRAPH_JOINING"
+	}
+	else if(value==4){
+	return "GRAPH_JOINED"
+	}
+	else if(value==5){
+	return "GRAPH_LOCK"
+	}
+  else {
+	return "UNDETERMINED"
+	}
+}
+#
+# map from state to int - vstig serialization limits to 9....
+#
+function s2i(value){
+	if(value=="CHAIN_FORMATION"){
+	return 0
+	}else if(value=="IDLE"){
+	return 1
+	}
+	else if(value=="DEPLOY"){
+	return 2
+	}
+	else if(value=="STOP"){
+	return 3
+	}
+	else if(value=="TURNEDOFF"){
+	return 4
+	}
+	else if(value=="BARRIERWAIT"){
+	return 5
+	}
+	else if(value=="WAYPOINT"){
+	return 6
+	}
+	else if(value=="GOHOME"){
+	return 7
+	}
+	else if(value=="LAUNCH"){
+	return 8
+	}
+	else if(value=="TASK_ALLOCATE"){
+	return 9
+	}
+  else
+    return -1
+}
+function s2i_graph(value){
+	if(value=="GRAPH_FREE"){
+	return 1
+	}
+	else if(value=="GRAPH_ASKING"){
+	return 2
+	}
+	else if(value=="GRAPH_JOINING"){
+	return 3
+	}
+	else if(value=="GRAPH_JOINED"){
+	return 4
+	}
+	else if(value=="GRAPH_LOCK"){
+	return 5
+	}
+  else {
+	return 0
+	}
+}
+
+#
+# Make 'table' namespace
+#
+table = {}
+
+#
+# Returns the maximum value in the table
+#
+table.max = function(t) {
+  return reduce(t, function(k, v, a) {
+      return math.max(v, a)
+    },
+    nil)
+}
+
+#
+# Returns the maximum key in the table
+#
+table.maxkey = function(t) {
+  return reduce(t, function(k, v, a) {
+      return math.max(k, a)
+    },
+    nil)
+}
+
+#
+# Returns the minimum value in the table
+#
+table.min = function(t) {
+  return reduce(t, function(k, v, a) {
+      return math.min(v, a)
+    },
+    nil)
+}
+
+#
+# Returns the minimum key in the table
+#
+table.minkey = function(t) {
+  return reduce(t, function(k, v, a) {
+      return math.min(k, a)
+    },
+    nil)
+}
+
+#
+# Prints the contents of a table.
+# PARAM t: The table
+#
+table.print = function(t) {
+  foreach(t, function(k,v) {
+      log(k, " -> ", v)
+    })
+}
+
+#
+# Swap table elements.
+# PARAM t: The table
+# PARAM a: Index of first element 
+# PARAM b: Index of second element
+#
+table.swap = function(t, i, j) {
+  if(i != j) {
+    var k = t[i]
+    t[i] = t[j]
+    t[j] = k
+  }
+}
+
+#
+# Number comparator.
+# PARAM a: A number
+# PARAM b: A number
+# RETURN: nil if a > b, 1 otherwise
+#
+table.cmp_number = function(a, b) {
+  return (a <= b)
+}
+
+#
+# In-place table sorting.
+# Sorts the elements of a table using the given precedence comparator.
+# The comparator must follow this logic:
+# function cmp(a,b) {
+#   if(a <= b) return 1
+#   else return 0
+# }
+#
+# PARAM t:   The table
+# PARAM cmp: The comparator
+#
+table.sort = function(t, cmp) {
+  #
+  # Partition elements by pivot
+  #
+  partition = function(l, h) {
+    # We use the last element as pivot 
+    pivot = t[h]
+    # Used to mark the current element after the pivot
+    var i = l
+    # Move elements according to pivot
+    var j = l
+    while(j < h) {
+      # Compare current element with pivot
+      if(cmp(t[j], pivot)) {
+        # Swap current element with smallest
+        table.swap(t, i, j)
+        # Increase index of element after pivot
+        i = i + 1
+      }
+      # Next element
+      j = j + 1
+    }
+    # Swap pivot element with smallest
+    table.swap(t, i, h)
+    return i
+  }
+  #
+  # Quicksort
+  #
+  qsort = function(l, h) {
+    # There are still elements to partition
+    if(l < h) {
+      # Partitioning index
+      var p = partition(l, h)
+      # Sort elements before and after p
+      qsort(l, p-1)
+      qsort(p+1, h)
+    }
+  }
+  qsort(0, size(t)-1)
+}
+
+#
+# In-place table shuffling.
+# PARAM t: The table
+#
+table.shuffle = function(t) {
+  # Durstenfeld shuffle algorithm
+  var i = 0
+  var sz = size(t)
+  while(i < sz-1) {
+    var j = math.rng.uniform(i, sz)
+    table.swap(t, i, j)
+    i = i + 1
+  }
+}

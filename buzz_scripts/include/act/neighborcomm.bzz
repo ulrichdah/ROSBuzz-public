@@ -1,0 +1,208 @@
+# listens to commands from the remote control (web, commandline, rcclient node, etc)
+function rc_cmd_listen() {
+	if(BVMSTATE=="TURNEDOFF") {
+		if(flight.rc_cmd==400) {	#ARM
+			flight.rc_cmd=0
+			arm()
+			neighbors.broadcast("cmd", 400)
+		} else if (flight.rc_cmd==401){	#DISARM
+			flight.rc_cmd=0
+			disarm()
+			neighbors.broadcast("cmd", 401)
+		} else if(flight.rc_cmd==22) {	#TAKEOFF\LAUNCH
+			flight.rc_cmd=0
+			BVMSTATE = "LAUNCH"
+			neighbors.broadcast("cmd", 22)
+		} else if (flight.rc_cmd==777){	#SYNC
+			flight.rc_cmd=0
+			reinit_time_sync()
+			neighbors.broadcast("cmd", 777)
+		} else if (flight.rc_cmd==903 and BVMSTATE!="BARRIERWAIT"){
+			flight.rc_cmd=0
+			AUTO_LAUNCH_STATE = "CHAIN_FORMATION"
+			neighbors.broadcast("cmd", 903)
+		} else if (flight.rc_cmd==901 and BVMSTATE!="BARRIERWAIT"){
+			flight.rc_cmd=0
+			AUTO_LAUNCH_STATE = "DEPLOY"
+			neighbors.broadcast("cmd", 901)
+		} else if (flight.rc_cmd==902 and BVMSTATE!="BARRIERWAIT"){
+			flight.rc_cmd=0
+			AUTO_LAUNCH_STATE = "WAYPOINT"
+			neighbors.broadcast("cmd", 902)
+		}
+	} else {
+		if(flight.rc_cmd==21) {
+			flight.rc_cmd=0
+			BVMSTATE = "STOP"
+			neighbors.broadcast("cmd", 21)
+		} else if(BVMSTATE!="BARRIERWAIT" and BVMSTATE!="LAUNCH") {
+			 if(flight.rc_cmd==20) {
+				flight.rc_cmd=0
+				destroyGraph()
+				check_rc_wp()
+				AUTO_LAUNCH_STATE = "IDLE"
+				barrier_set(ROBOTS, "GOHOME", BVMSTATE, 20)
+				barrier_ready(20)
+				neighbors.broadcast("cmd", 20)
+			} else if (flight.rc_cmd==666){
+				flight.rc_cmd=0
+				stattab_send()
+			} else if (flight.rc_cmd==900){
+				flight.rc_cmd=0
+				barrier_set(ROBOTS, "TASK_ALLOCATE", BVMSTATE, 900)
+				barrier_ready(900)
+				neighbors.broadcast("cmd", 900)
+			} else if (flight.rc_cmd==901){
+				flight.rc_cmd=0
+				destroyGraph()
+				check_rc_wp()
+				barrier_set(ROBOTS, "DEPLOY", BVMSTATE, 901)
+				barrier_ready(901)
+				neighbors.broadcast("cmd", 901)
+			} else if (flight.rc_cmd==902){
+				flight.rc_cmd=0
+				destroyGraph()
+				check_rc_wp()
+				barrier_set(ROBOTS, "WAYPOINT", BVMSTATE, 902)
+				barrier_ready(902)
+				neighbors.broadcast("cmd", 902)
+			} else if (flight.rc_cmd==903){
+				flight.rc_cmd=0
+				destroyGraph()
+				resetWP()
+				check_rc_wp()
+				barrier_set(ROBOTS, "PURSUIT", BVMSTATE, 903)
+				barrier_ready(903)
+				neighbors.broadcast("cmd", 903)
+			} else if (flight.rc_cmd==904){
+				flight.rc_cmd=0
+				destroyGraph()
+				resetWP()
+				barrier_set(ROBOTS, "IDLE", BVMSTATE, 904)
+				barrier_ready(904)
+				neighbors.broadcast("cmd", 904)
+			}
+		}
+	}
+}
+
+# listens to neighbors broadcasting commands
+function nei_cmd_listen() {
+	if(CA_ON==2){
+		setup_velocity_callbacks()
+	}
+
+    neighbors.listen("cmd",
+			function(vid, value, rid) {
+				print("Got (", vid, ",", value, ") #", rid, "(", BVMSTATE, ")")
+				if(BVMSTATE=="TURNEDOFF") {
+					if(value==22) {
+						BVMSTATE = "LAUNCH"
+					} else if(value==400) {
+						arm()
+					} else if(value==401){
+						disarm()
+					} else if(value==777){
+						reinit_time_sync()
+					} else if(value==903){
+						AUTO_LAUNCH_STATE = "CHAIN_FORMATION"
+						barrier_set(ROBOTS, "TURNEDOFF", BVMSTATE, 903)
+						neighbors.broadcast("cmd", 903)
+					} else if(value==901){
+						AUTO_LAUNCH_STATE = "DEPLOY"
+						barrier_set(ROBOTS, "TURNEDOFF", BVMSTATE, 901)
+						neighbors.broadcast("cmd", 901)
+					} else if(value==902){
+						AUTO_LAUNCH_STATE = "WAYPOINT"
+						barrier_set(ROBOTS, "TURNEDOFF", BVMSTATE, 902)
+						neighbors.broadcast("cmd", 902)
+					}
+				} else {
+					if(value==21 and BVMSTATE != "STOP") {
+						BVMSTATE = "STOP"
+						neighbors.broadcast("cmd", 21)
+					}else if(BVMSTATE!="BARRIERWAIT" and BVMSTATE!="LAUNCH") {
+						if(value==20 and BVMSTATE!="GOHOME") {
+							AUTO_LAUNCH_STATE = "IDLE"
+							resetWP()
+							#if(BVMSTATE!=AUTO_LAUNCH_STATE)
+								barrier_set(ROBOTS, "GOHOME", BVMSTATE, 20)
+							#barrier_ready(20)
+						} else if(value==900 and BVMSTATE!="TASK_ALLOCATE"){	# Shapes
+							barrier_set(ROBOTS, "TASK_ALLOCATE", BVMSTATE, 900)
+							#barrier_ready(900)
+							#neighbors.broadcast("cmd", 900)
+						} else if(value==901 and BVMSTATE!="DEPLOY" ){	# Voronoi
+							destroyGraph()
+							barrier_set(ROBOTS, "DEPLOY", BVMSTATE, 901)
+							#barrier_ready(901)
+							#neighbors.broadcast("cmd", 901)
+						} else if(value==902 and BVMSTATE!="WAYPOINT"){	# Waypoint
+							destroyGraph()
+							barrier_set(ROBOTS, "WAYPOINT", BVMSTATE, 902)
+							#barrier_ready(902)
+							#neighbors.broadcast("cmd", 902)
+						} else if(value==903 and BVMSTATE!="PURSUIT"){	# Pursuit
+							destroyGraph()
+							barrier_set(ROBOTS, "PURSUIT", BVMSTATE, 903)
+							#barrier_ready(903)
+							#neighbors.broadcast("cmd", 903)
+						} else if(value==904 and BVMSTATE!="IDLE"){	# idle
+							destroyGraph()
+							resetWP()
+							barrier_set(ROBOTS, "IDLE", BVMSTATE, 904)
+							#barrier_ready(904)
+							#neighbors.broadcast("cmd", 904)
+						}
+						else if(value==555 and BVMSTATE=="YOLO_DEMO"){
+							YOLO_NEI_TARGET = 1
+						} else if(value==556 and BVMSTATE=="YOLO_DEMO"){
+							YOLO_NEI_TARGET = 2
+						}
+					}
+				}
+    })
+}
+
+firsttimeinwp = 1
+WPtab_id = 10
+function check_rc_wp() {
+	if(firsttimeinwp) {
+		v_wp = stigmergy.create(WP_STIG)
+		storegoal(pose.position.latitude, pose.position.longitude, pose.position.altitude)
+		firsttimeinwp = 0
+	}
+	if(rc_goto.id != -1) {
+		if(rc_goto.id == id) {
+			wpreached = 0
+			storegoal(rc_goto.latitude, rc_goto.longitude, pose.position.altitude)
+			return 0
+		} else {
+			var ls = packWP2i(rc_goto.latitude, rc_goto.longitude, 0)
+			if(rc_goto.id>49) {	# Attractor/repulsor table
+				WPtab = v_wp.get(WPtab_id)
+				if(WPtab!=nil)
+					WPtab[rc_goto.id]=ls
+				else {
+					WPtab={}
+					WPtab[rc_goto.id]=ls
+				}
+				v_wp.put(WPtab_id,WPtab)
+			} else  # Individual waypoint
+				v_wp.put(rc_goto.id,ls)
+			reset_rc()
+		}
+	} else
+		v_wp.get(0)
+	return 1
+}
+
+function resetWP() {
+	firsttimeinwp = 1
+	if(v_wp!=nil){
+		#v_wp.foreach(function(key, value, robot){v_wp[key]=nil})
+		v_wp.put(WPtab_id,WPtab)
+		#v_wp = nil
+		#firsttimeinwp = 1
+	}
+}
